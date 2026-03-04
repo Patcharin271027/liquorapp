@@ -5,7 +5,7 @@ import plotly.express as px
 from datetime import datetime, date
 
 # 1. ตั้งค่าหน้าจอ
-st.set_page_config(layout="wide", page_title="ระบบจัดการยอดซื้อบ้านลุงทอม Cloud")
+st.set_page_config(layout="wide", page_title="ระบบจัดการยอดซื้อบ้านลุงทอม")
 
 # 2. เชื่อมต่อ Supabase
 conn = st.connection("supabase", type=SupabaseConnection)
@@ -73,3 +73,4 @@ if not df.empty:
     for i, row in df.iterrows():
         if row['file_url']:
             st.link_button(f"🔗 ดูบิลรายการที่ {row['id']}", row['file_url'])
+
