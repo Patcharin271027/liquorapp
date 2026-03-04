@@ -1,4 +1,7 @@
 streamlit
 pandas
 plotly
+
 xlsxwriter
+st-supabase-connection
+supabase
