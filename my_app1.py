@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from st_supabase_connection import SupabaseConnection
 from datetime import datetime, date
+import plotly.express as px
 
 # 1. ตั้งค่าหน้าจอ
 st.set_page_config(layout="wide", page_title="ระบบจัดการยอดซื้อบ้านลุงทอม Cloud")
@@ -38,20 +39,8 @@ with st.sidebar:
                 conn.table("config_hotels").delete().eq("name", h_to_del).execute()
                 st.rerun()
 
-    with st.expander("🚚 จัดการรายชื่อ Supplier"):
-        new_s = st.text_input("ชื่อ Supplier ใหม่", key="new_sup")
-        if st.button("เพิ่ม Supplier", use_container_width=True):
-            if new_s:
-                conn.table("config_suppliers").insert({"name": new_s.strip()}).execute()
-                st.rerun()
-        if suppliers:
-            s_to_del = st.selectbox("เลือก Supplier ที่จะลบ", [""] + suppliers, key="del_sup")
-            if st.button("❌ ลบชื่อ Supplier"):
-                conn.table("config_suppliers").delete().eq("name", s_to_del).execute()
-                st.rerun()
-
-# --- ส่วนหลัก: บันทึกยอดซื้อและแนบบิล ---
-with st.expander("📝 บันทึกยอดซื้อใหม่", expanded=True):
+# --- ส่วนหลัก: บันทึกจำนวนขวดและแนบบิล ---
+with st.expander("📝 บันทึกจำนวนขวดใหม่", expanded=True):
     if not hotels or not suppliers:
         st.info("💡 กรุณาเพิ่มรายชื่อโรงแรมและ Supplier ที่แถบด้านซ้ายก่อนนะคะ")
     else:
@@ -60,10 +49,7 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
             sup_val = col1.selectbox("เลือก Supplier", suppliers)
             hotel_val = col1.selectbox("เลือกโรงแรม", hotels)
             date_val = col2.date_input("วันที่ซื้อ", date.today())
-            
-            # แก้ไขเป็นจำนวนขวด (ตัวเลขจำนวนเต็ม)
             amount_val = col2.number_input("จำนวนขวด", min_value=0, step=1)
-            
             uploaded_file = st.file_uploader("แนบบิล (JPG, PNG, PDF)", type=['pdf', 'jpg', 'png', 'jpeg'])
             
             if st.form_submit_button("บันทึกข้อมูล"):
@@ -84,9 +70,9 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
                     st.success("✅ บันทึกสำเร็จ!")
                     st.rerun()
 
-# --- ส่วนรายงาน: ตาราง Pivot สรุปยอดขวด ---
+# --- ส่วนรายงานและกราฟ ---
 st.divider()
-st.subheader("📊 รายงานสรุปจำนวนขวด")
+st.subheader("📊 รายงานสรุปจำนวนขวดและสัดส่วน")
 try:
     res = conn.table("spirit_sales").select("*").execute()
     df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
@@ -105,27 +91,33 @@ try:
         df_filtered = df.loc[mask].copy()
 
         if not df_filtered.empty:
-            # สร้างตาราง Pivot สรุปรายเดือน
-            df_filtered = df_filtered.sort_values('sale_date')
-            df_filtered['month_year'] = df_filtered['sale_date'].dt.strftime('%b-%y')
+            # --- 1. แสดงกราฟวงกลมสัดส่วนยอดซื้อตามโรงแรม ---
+            df_pie = df_filtered.groupby('hotel')['amount'].sum().reset_index()
+            fig = px.pie(df_pie, values='amount', names='hotel', title='สัดส่วนการซื้อแยกตามโรงแรม (%)', hole=0.3)
+            st.plotly_chart(fig, use_container_width=True)
+
+            # --- 2. ตารางสรุปเปอร์เซ็นต์จากยอด Total ---
+            total_all = df_pie['amount'].sum()
+            df_pie['สัดส่วน (%)'] = (df_pie['amount'] / total_all * 100).round(2)
+            df_pie.columns = ['ชื่อโรงแรม', 'จำนวนขวดรวม', 'สัดส่วน (%)']
             
+            st.write("📋 **สรุปยอดรวมและเปอร์เซ็นต์แยกตามโรงแรม**")
+            st.table(df_pie)
+            st.info(f"✨ ยอดรวมขวดทั้งหมดในช่วงเวลานี้: {int(total_all)} ขวด")
+
+            # --- 3. ตาราง Pivot รายเดือนแบบเดิม ---
+            df_filtered['month_year'] = df_filtered['sale_date'].dt.strftime('%b-%y')
             pivot = df_filtered.pivot_table(
-                index=['supplier', 'hotel'], 
-                columns='month_year', 
-                values='amount', 
-                aggfunc='sum', 
-                fill_value=0, 
-                margins=True, 
-                margins_name='TOTAL', 
-                sort=False
+                index=['supplier', 'hotel'], columns='month_year', 
+                values='amount', aggfunc='sum', fill_value=0, 
+                margins=True, margins_name='TOTAL', sort=False
             )
-            # แสดงผลตารางแบบไม่มีทศนิยม
+            st.write("📅 **รายงานสรุปรายเดือน**")
             st.dataframe(pivot.astype(int), use_container_width=True)
 
             # ส่วนจัดการไฟล์แนบ
             with st.expander("📝 ดูบิลแนบ และ จัดการข้อมูล"):
                 for i, row in df_filtered.sort_values('sale_date', ascending=False).iterrows():
-                    # แสดงผลเป็นจำนวนขวดแบบไม่มีทศนิยม
                     st.write(f"ID: {row['id']} | {row['hotel']} | {int(row['amount']):,} ขวด ({row['sale_date'].date()})")
                     c1, c2 = st.columns([2, 1])
                     if row['file_url']:
