@@ -76,7 +76,7 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
                 if amount_val > 0:
                     file_url = ""
                     if uploaded_file:
-                        file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
+                        conn.storage.from_("liquor_attachments").upload(file_name, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
                         conn.storage.from_("liquor_attachments").upload(file_name, uploaded_file.getvalue())
                         file_url = conn.storage.from_("liquor_attachments").get_public_url(file_name)
                     
@@ -137,4 +137,5 @@ try:
         st.info("ยังไม่มีข้อมูลในระบบ")
 except:
     st.info("รอการบันทึกรายการแรก...")
+
 
