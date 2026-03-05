@@ -33,11 +33,6 @@ with st.sidebar:
             if new_h:
                 conn.table("config_hotels").insert({"name": new_h.strip()}).execute()
                 st.rerun()
-        if hotels:
-            h_to_del = st.selectbox("เลือกโรงแรมที่จะลบ", [""] + hotels, key="del_hotel")
-            if st.button("❌ ลบชื่อโรงแรม"):
-                conn.table("config_hotels").delete().eq("name", h_to_del).execute()
-                st.rerun()
 
 # --- ส่วนหลัก: บันทึกจำนวนขวดและแนบบิล ---
 with st.expander("📝 บันทึกจำนวนขวดใหม่", expanded=True):
@@ -72,7 +67,7 @@ with st.expander("📝 บันทึกจำนวนขวดใหม่", 
 
 # --- ส่วนรายงานและกราฟ ---
 st.divider()
-st.subheader("📊 รายงานสรุปจำนวนขวดและสัดส่วน")
+st.subheader("📊 รายงานสรุปและสัดส่วนการซื้อ")
 try:
     res = conn.table("spirit_sales").select("*").execute()
     df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
@@ -91,28 +86,33 @@ try:
         df_filtered = df.loc[mask].copy()
 
         if not df_filtered.empty:
-            # --- 1. แสดงกราฟวงกลมสัดส่วนยอดซื้อตามโรงแรม ---
+            # 1. กราฟวงกลม
             df_pie = df_filtered.groupby('hotel')['amount'].sum().reset_index()
+            total_all = df_pie['amount'].sum()
             fig = px.pie(df_pie, values='amount', names='hotel', title='สัดส่วนการซื้อแยกตามโรงแรม (%)', hole=0.3)
             st.plotly_chart(fig, use_container_width=True)
 
-            # --- 2. ตารางสรุปเปอร์เซ็นต์จากยอด Total ---
-            total_all = df_pie['amount'].sum()
+            # 2. ตารางสรุปเปอร์เซ็นต์
             df_pie['สัดส่วน (%)'] = (df_pie['amount'] / total_all * 100).round(2)
             df_pie.columns = ['ชื่อโรงแรม', 'จำนวนขวดรวม', 'สัดส่วน (%)']
-            
-            st.write("📋 **สรุปยอดรวมและเปอร์เซ็นต์แยกตามโรงแรม**")
+            st.write("📋 **สรุปยอดรวมและเปอร์เซ็นต์**")
             st.table(df_pie)
             st.info(f"✨ ยอดรวมขวดทั้งหมดในช่วงเวลานี้: {int(total_all)} ขวด")
 
-            # --- 3. ตาราง Pivot รายเดือนแบบเดิม ---
+            # 3. ตาราง Pivot (จัดเรียงเดือนอย่างถูกต้อง)
+            df_filtered = df_filtered.sort_values('sale_date') # เรียงลำดับเวลาในข้อมูลดิบก่อน
             df_filtered['month_year'] = df_filtered['sale_date'].dt.strftime('%b-%y')
+            
+            # ใช้ Categorical เพื่อบังคับลำดับเดือนตามเวลาจริง ไม่ใช่ตัวอักษร
+            month_order = df_filtered.sort_values('sale_date')['month_year'].unique()
+            df_filtered['month_year'] = pd.Categorical(df_filtered['month_year'], categories=month_order, ordered=True)
+
             pivot = df_filtered.pivot_table(
                 index=['supplier', 'hotel'], columns='month_year', 
                 values='amount', aggfunc='sum', fill_value=0, 
                 margins=True, margins_name='TOTAL', sort=False
             )
-            st.write("📅 **รายงานสรุปรายเดือน**")
+            st.write("📅 **รายงานสรุปรายเดือน (เรียงตามเวลา)**")
             st.dataframe(pivot.astype(int), use_container_width=True)
 
             # ส่วนจัดการไฟล์แนบ
