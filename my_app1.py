@@ -60,7 +60,7 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
             sup_val = col1.selectbox("เลือก Supplier", suppliers)
             hotel_val = col1.selectbox("เลือกโรงแรม", hotels)
             date_val = col2.date_input("วันที่ซื้อ", date.today())
-            amount_val = col2.number_input("ยอดเงิน (บาท)", min_value=0.0, step=0.01)
+            amount_val = col2.number_input("จำนวนขวด", min_value=0.0, step=0.01)
             uploaded_file = st.file_uploader("แนบบิล (JPG, PNG, PDF)", type=['pdf', 'jpg', 'png', 'jpeg'])
             
             if st.form_submit_button("บันทึกข้อมูล"):
@@ -130,3 +130,4 @@ try:
                         st.rerun()
 except:
     st.info("รอการบันทึกรายการแรก...")
+
