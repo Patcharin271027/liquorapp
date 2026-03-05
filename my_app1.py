@@ -73,19 +73,32 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
             uploaded_file = st.file_uploader("แนบบิล (JPG, PNG, PDF)", type=['pdf', 'jpg', 'png', 'jpeg'])
             
             if st.form_submit_button("บันทึกข้อมูล"):
-                if amount_val > 0:
-                    file_url = ""
-                    if uploaded_file:
-                        conn.storage.from_("liquor_attachments").upload(file_name, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
-                        conn.storage.from_("liquor_attachments").upload(file_name, uploaded_file.getvalue())
-                        file_url = conn.storage.from_("liquor_attachments").get_public_url(file_name)
+            if amount_val > 0:
+                file_url = ""
+                
+                # ส่วนจัดการไฟล์แนบ
+                if uploaded_file:
+                    # 1. อัปโหลดไฟล์พร้อมระบุประเภท (เพื่อให้เปิดดูได้ ไม่เป็นตัวหนังสือยุ่งๆ)
+                    conn.storage.from_("liquor_attachments").upload(
+                        file_name, 
+                        uploaded_file.getvalue(), 
+                        {"content-type": uploaded_file.type}
+                    )
                     
-                    conn.table("spirit_sales").insert({
-                        "supplier": sup_val, "hotel": hotel_val, 
-                        "sale_date": str(date_val), "amount": amount_val, "file_url": file_url
-                    }).execute()
-                    st.success("✅ บันทึกสำเร็จ!")
-                    st.rerun()
+                    # 2. ดึงลิงก์สาธารณะมาเก็บไว้ลงฐานข้อมูล
+                    file_url = conn.storage.from_("liquor_attachments").get_public_url(file_name)
+                
+                # ส่วนบันทึกข้อมูลลงตาราง spirit_sales
+                conn.table("spirit_sales").insert({
+                    "supplier": sup_val, 
+                    "hotel": hotel_val, 
+                    "sale_date": str(date_val), 
+                    "amount": amount_val, 
+                    "file_url": file_url
+                }).execute()
+                
+                st.success("✅ บันทึกสำเร็จ!")
+                st.rerun()
 
 # --- ส่วนรายงาน: เรียงลำดับจากเดือนเก่าไปหาเดือนใหม่ ---
 st.divider()
@@ -137,5 +150,6 @@ try:
         st.info("ยังไม่มีข้อมูลในระบบ")
 except:
     st.info("รอการบันทึกรายการแรก...")
+
 
 
