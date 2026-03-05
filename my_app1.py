@@ -60,7 +60,10 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
             sup_val = col1.selectbox("เลือก Supplier", suppliers)
             hotel_val = col1.selectbox("เลือกโรงแรม", hotels)
             date_val = col2.date_input("วันที่ซื้อ", date.today())
-            amount_val = col2.number_input("จำนวนขวด", min_value=0.0, step=0.01)
+            
+            # แก้ไขเป็นจำนวนขวด (ตัวเลขจำนวนเต็ม)
+            amount_val = col2.number_input("จำนวนขวด", min_value=0, step=1)
+            
             uploaded_file = st.file_uploader("แนบบิล (JPG, PNG, PDF)", type=['pdf', 'jpg', 'png', 'jpeg'])
             
             if st.form_submit_button("บันทึกข้อมูล"):
@@ -81,9 +84,9 @@ with st.expander("📝 บันทึกยอดซื้อใหม่", exp
                     st.success("✅ บันทึกสำเร็จ!")
                     st.rerun()
 
-# --- ส่วนรายงาน: ตาราง Pivot แบบเดิมที่คุณต้องการ ---
+# --- ส่วนรายงาน: ตาราง Pivot สรุปยอดขวด ---
 st.divider()
-st.subheader("📊 รายงานสรุปยอดซื้อ")
+st.subheader("📊 รายงานสรุปจำนวนขวด")
 try:
     res = conn.table("spirit_sales").select("*").execute()
     df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
@@ -116,12 +119,14 @@ try:
                 margins_name='TOTAL', 
                 sort=False
             )
-            st.dataframe(pivot, use_container_width=True)
+            # แสดงผลตารางแบบไม่มีทศนิยม
+            st.dataframe(pivot.astype(int), use_container_width=True)
 
             # ส่วนจัดการไฟล์แนบ
             with st.expander("📝 ดูบิลแนบ และ จัดการข้อมูล"):
                 for i, row in df_filtered.sort_values('sale_date', ascending=False).iterrows():
-                    st.write(f"ID: {row['id']} | {row['hotel']} | {row['amount']:,.2f} ฿ ({row['sale_date'].date()})")
+                    # แสดงผลเป็นจำนวนขวดแบบไม่มีทศนิยม
+                    st.write(f"ID: {row['id']} | {row['hotel']} | {int(row['amount']):,} ขวด ({row['sale_date'].date()})")
                     c1, c2 = st.columns([2, 1])
                     if row['file_url']:
                         c1.link_button(f"🔗 ดูบิล ID {row['id']}", row['file_url'])
@@ -130,4 +135,3 @@ try:
                         st.rerun()
 except:
     st.info("รอการบันทึกรายการแรก...")
-
